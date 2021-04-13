@@ -1,5 +1,11 @@
 # Make your Nilan Air ventilating system way more cool ;)
 
+## Info
+
+My (nic6911) contribution here is a hardware design, a slimmed version of the ESP code to match the hardware I have made and some 3D files for a nice casing.
+The rest is left unchanged including much of this readme.
+
+
 This little cool project lets you use you Home Assistant to control and read values from your Nilan air vent system. I have the Nilan Comfort 300 combined with the CTS602 panel. It works great, but do not know if it is compatible with other models.
 
 The code for the project is not developed by me, but I made some adjustmenst to it, so it would integrate better with Home Assistant. The project is originally made for use with OpenHab.
@@ -16,16 +22,28 @@ UPDATE 1/1-2020 : Now added a .ino file for use with a Nilan VPL15 system. Creat
 
 ### Installing the firmware:
 
-I used the arduino editor to upload the code to my ESP8266 (for now a wemos D1 mini). If your sketch wont compile please check if you use the arduino.json V. 5 or V.6 library. This code uses V.6 and wont build with V.5. 
+I used the arduino editor to upload the code to my ESP8266 (ESP-01). If your sketch wont compile please check if you use the arduino.json V. 5 or V.6 library. This code uses V.6 and wont build with V.5. 
+I (nic6911) have adapted the code in this fork to fit with the hardware I have constructed and thus some generic features have been removed.
 
 For setting up your wifi and mqtt broker provide your credentials in the configuration.h file
 
 
 ### Setup the Hardware:
 
-For my project i use af Wemos D1 mini board connected to a RS485 board (bought form ali-express). You connect from the Wemos the RX to RX on the RS485 and the TX to TX. This wont work if you cross them.
+The Hardware used here is a design done by me (nic6911) and is a mutli-purpose ESP-01 Modbus module that was intended for Wavin AHC9000 and Nilan ventilation. But since it is pretty generic it will suit most modus applications.
+The hardware includes buck converter supplying the ESP-01 and Modbus module with 3.3V from anything going from 8-24V (28V absolute max rating) as 12V and 24V are usually available on these systems for powering something like this.
 
-Then connect the RS485 A,B and GND channel to the corresponding ports on you Nilan Vent System.
+#### Revision 2.1
+To facilitate code versions using Modbus converters without the data direction controlled from the ESP I have implemented Automatic Direction Control. This also makes one more IO available for other uses.
+I have decided to add 2 x Optocoupler, one on each available IO, to have isolated outputs which I intend to use for my Nilan system.
+This effectively means that the rev 2.1 is a more general purpose hardware platform that in my case will be used for both my Wavin and Nilan setups.
+
+The following schematic shows how my board is constructed in rev 2.1
+![Schematic](/electronics/schematic.png)
+
+My board design rev 2.1 is seen here:
+![Bottom](/electronics/Bottom.PNG)
+![Top](/electronics/Top.PNG)
 
 ### Getting values by HTTP:
 
