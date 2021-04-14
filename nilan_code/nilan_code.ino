@@ -58,8 +58,8 @@ const char* mqttserver = MQTTSERVER;
 const char* mqttusername = MQTTUSERNAME;
 const char* mqttpassword = MQTTPASSWORD;
 WiFiServer server(80);
-WiFiClient client;
-PubSubClient mqttclient(client);
+WiFiClient wifiClient;
+PubSubClient mqttclient(wifiClient);
 static long lastMsg = -SENDINTERVAL;
 static int16_t rsbuffer[MAXREGSIZE];
 ModbusMaster node;
@@ -411,7 +411,7 @@ if (strcmp(topic, "ventilation/usertempset") == 0)
   lastMsg = -SENDINTERVAL;
 }
 
-bool readRequest(WiFiClient &client)
+bool readRequest(WiFiClient &wifiClient)
 {
   req[0] = "";
   req[1] = "";
@@ -420,11 +420,11 @@ bool readRequest(WiFiClient &client)
 
   int n = -1;
   bool readstring = false;
-  while (client.connected())
+  while (wifiClient.connected())
   {
-    if (client.available())
+    if (wifiClient.available())
     {
-      char c = client.read();
+      char c = wifiClient.read();
       if (c == '\n')
       {
         return false;
@@ -447,13 +447,13 @@ bool readRequest(WiFiClient &client)
   return false;
 }
 
-void writeResponse(WiFiClient& client, const JsonDocument& doc)  
+void writeResponse(WiFiClient& wifiClient, const JsonDocument& doc)  
 {
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: application/json");
-  client.println("Connection: close");
-  client.println();
-  serializeJsonPretty(doc,client);
+  wifiClient.println("HTTP/1.1 200 OK");
+  wifiClient.println("Content-Type: application/json");
+  wifiClient.println("Connection: close");
+  wifiClient.println();
+  serializeJsonPretty(doc,wifiClient);
 }
 //readHoldingRegisters  readInputRegisters
 char ReadModbus(uint16_t addr, uint8_t sizer, int16_t *vals, int type)
@@ -516,18 +516,18 @@ void mqttreconnect()
 void loop()
 {
   ArduinoOTA.handle();
-  WiFiClient client = server.available();
-  if (client)
+  WiFiClient wifiClient = server.available();
+  if (wifiClient)
   {
-    bool success = readRequest(client);
+    bool success = readRequest(wifiClient);
     if (success)
     {
       StaticJsonDocument<1000> doc;
       HandleRequest(doc);
  
-      writeResponse(client, doc);
+      writeResponse(wifiClient, doc);
     }
-    client.stop();
+    wifiClient.stop();
   }
 
   if (!mqttclient.connected())
