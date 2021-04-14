@@ -1,5 +1,9 @@
 # Make your Nilan Air ventilating system way more cool ;)
 
+## Disclaimer
+Do this at your own risk ! You are interfacing with hardware that you can potentially damage if you do not connect things as required !
+Using the hardware and code presented here is done at you own risk. The hardware and software has been tested on Wavin AHC9000 and Nilan Comfort 300 without issues.
+
 ## Info
 
 My (nic6911) contribution here is a hardware design, a slimmed version of the ESP code to match the hardware I have made and some 3D files for a nice casing.
@@ -44,6 +48,11 @@ The following schematic shows how my board is constructed in rev 2.1
 My board design rev 2.1 is seen here:
 ![Bottom](/electronics/Bottom.PNG)
 ![Top](/electronics/Top.PNG)
+
+A wiring example on a Comfort 300 and Wavin AHC9000 is shown here:
+![Top](/electronics/Connections.png)
+
+On the Wavin you simply use a patch cable (straight) and connect it from the module to the Modbus port and then you are done :)
 
 ### Getting values by HTTP:
 
