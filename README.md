@@ -31,6 +31,20 @@ I (nic6911) have adapted the code in this fork to fit with the hardware I have c
 
 For setting up your wifi and mqtt broker provide your credentials in the configuration.h file
 
+#### Video Tutorials
+These tutorials was made for my Wavin code, but the exact same applies for this Nilan code. The Nilan code also supports OTA update as the Wavin.
+
+For setting up Home Assistant for MQTT, finding the Wavin client and adding zones looke here:
+https://youtu.be/kwnt9SaQ6Jc
+
+For the above to work you have to have a programmed ESP-01 talking modbus (like my module with ESP-01) which is shown next.
+
+For programming the ESP-01 using a programmer look here:
+https://youtu.be/PWJ3N4B8Pc4
+
+If you have a pre-programmed ESP-01 with OTA support then you have to install the library dependencies as above but do not have to use a programmer. You can then program it like shown here:
+https://youtu.be/2H5gkzoha98
+
 
 ### Setup the Hardware:
 
