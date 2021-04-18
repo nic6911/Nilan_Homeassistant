@@ -27,12 +27,35 @@ For Discovery use https://github.com/plapointe6/HAMqttDevice
 
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
-#include <ArduinoOTA.h>
 #include <ModbusMaster.h>
 #include <PubSubClient.h>
 #include "configuration.h"
+#include <ESP8266WebServer.h>
+#include <ESP8266HTTPUpdateServer.h>
 
+char apSSID[] = "ESP01Modbus";
+char apPass[] = "11111111";
 
+const char PAGE_index[] PROGMEM = R"=====(
+<!DOCTYPE html>
+<html><head><title>Flash this ESP8266!</title></head><body>
+<h2>Welcome!</h2>
+You are successfully connected to your ESP8266 via its WiFi.<br>
+Please click the button to proceed and upload a new binary firmware!<br><br>
+<b>Be sure to double check the firmware (.bin) is suitable for your chip!<br>
+I am not to be held liable if you accidentally flash a cat pic instead or something goes wrong during the update!<br>
+You are solely responsible for using this tool!</b><br><br>
+<form><input type="button" value="Select firmware..." onclick="window.location.href='/update'" />
+</form><br>
+(c) 2017 Christian Schwinne <br>
+<i>Licensed under the MIT license</i> <br>
+<i>Uses libraries:</i> <br>
+<i>ESP8266 Arduino Core</i> <br>
+</body></html>
+)=====";
+
+ESP8266WebServer server(80);
+ESP8266HTTPUpdateServer httpUpdater;
 
 #define HOST CUSTOM_HOSTNAME // Change this to whatever you like. 
 #define MAXREGSIZE 28
@@ -57,7 +80,6 @@ char chipid[12];
 const char* mqttserver = MQTTSERVER;
 const char* mqttusername = MQTTUSERNAME;
 const char* mqttpassword = MQTTPASSWORD;
-WiFiServer server(80);
 WiFiClient wifiClient;
 PubSubClient mqttclient(wifiClient);
 static long lastMsg = -SENDINTERVAL;
@@ -257,35 +279,49 @@ void setup()
   digitalWrite(funcact2, LOW);
   pinMode(funcact1, OUTPUT);
   pinMode(funcact2, OUTPUT);
+  delay(10000);
+  uint8_t fails = 0;
   char host[64];
   uint32_t chipID = ESP.getChipId();
   sprintf(chipid, "%08X", chipID);
   sprintf(host, HOST, chipid);
   delay(500);
   WiFi.hostname(host);
-  ArduinoOTA.setHostname(host);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  while (WiFi.waitForConnectResult() != WL_CONNECTED)
+    
+  //try to connect to WiFi for 3 times or launch webserver
+  while(fails<2 && WiFi.status() != WL_CONNECTED)
   {
-    delay(5000);
-    ESP.restart();
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(ssid, password);
+  
+      if (WiFi.waitForConnectResult() != WL_CONNECTED)
+      {
+        fails++;
+      }
+    }  
   }
-  ArduinoOTA.onStart([]() {
-  });
-  ArduinoOTA.onEnd([]() {
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-  });
-  ArduinoOTA.begin();
-  server.begin();
+  if(fails>1)
+  {
+    WiFi.mode(WIFI_OFF);
+    WiFi.softAP(apSSID, apPass);
+    server.onNotFound([](){
+      server.send(200, "text/html", PAGE_index);
+    });
+    httpUpdater.setup(&server);
+    server.begin();
+  
+    while(1)
+    {
+      server.handleClient();
+    }
+  }
   Serial.begin(19200, SERIAL_8E1);
   delay(100);
   node.begin(30, Serial);
   mqttclient.setServer(mqttserver, 1883);
-  mqttclient.setCallback(mqttcallback);
+  mqttclient.setCallback(mqttcallback); 
 }
 
 void mqttcallback(char *topic, byte *payload, unsigned int length)
@@ -515,9 +551,15 @@ void mqttreconnect()
 
 void loop()
 {
-  ArduinoOTA.handle();
-  WiFiClient wifiClient = server.available();
-  if (wifiClient)
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+
+    if (WiFi.waitForConnectResult() != WL_CONNECTED) return;
+  }
+
+  if (WiFi.status() == WL_CONNECTED)
   {
     bool success = readRequest(wifiClient);
     if (success)
@@ -528,227 +570,227 @@ void loop()
       writeResponse(wifiClient, doc);
     }
     wifiClient.stop();
-  }
 
-  if (!mqttclient.connected())
-  {
-    mqttreconnect();
-  }
-
-  if (mqttclient.connected())
-  {
-    mqttclient.loop();
-    long now = millis();
-    if (now - lastMsg > SENDINTERVAL)
+    if (!mqttclient.connected())
     {
-       reqtypes rr[] = {reqcontrol, reqtime, reqoutput1, reqoutput2, reqoutput3, reqspeed, reqalarm, reqinputairtemp, reqprogram, requser, reqinfo1, reqinfo2, reqinfo3, reqinfo4, reqtempone, reqtemptwo, reqtemptre, reqtempfour, reqairflow, reqairbypass}; // put another register in this line to subscribe
-      for (int i = 0; i < (sizeof(rr)/sizeof(rr[0])); i++)
-      {
-        reqtypes r = rr[i];
-        char result = ReadModbus(regaddresses[r], regsizes[r], rsbuffer, regtypes[r] & 1); 
-        if (result == 0)
-        {
-          mqttclient.publish("ventilation/error/modbus/", "0"); //no error when connecting through modbus
-          for (int i = 0; i < regsizes[r]; i++)
-          {
-            char *name = getName(r, i);
-            char numstr[10];
-            if (name != NULL && strlen(name) > 0)
-            {
-              String mqname = "temp/";
-              switch (r)
-              {
-              case reqcontrol:
-                mqname = "ventilation/control/"; // Subscribe to the "control" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;
-              case reqtime:
-                mqname = "ventilation/time/"; // Subscribe to the "output" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;
-              case reqoutput1:
-                mqname = "ventilation/output/"; // Subscribe to the "output" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;
-              case reqoutput2:
-                mqname = "ventilation/output/"; // Subscribe to the "output" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;
-              case reqoutput3:
-                mqname = "ventilation/output/"; // Subscribe to the "output" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;
-//              case reqdisplay:
-//                mqname = "ventilation/display/"; // Subscribe to the "input display" register
-//                itoa((rsbuffer[i]), numstr, 10);
-//                break;
-              case reqspeed:
-                mqname = "ventilation/speed/"; // Subscribe to the "speed" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;
-              case reqalarm:
-                mqname = "ventilation/alarm/"; // Subscribe to the "alarm" register
+      mqttreconnect();
+    }
 
-                switch (i) 
+    if (mqttclient.connected())
+    {
+      mqttclient.loop();
+      long now = millis();
+      if (now - lastMsg > SENDINTERVAL)
+      {
+         reqtypes rr[] = {reqcontrol, reqtime, reqoutput1, reqoutput2, reqoutput3, reqspeed, reqalarm, reqinputairtemp, reqprogram, requser, reqinfo1, reqinfo2, reqinfo3, reqinfo4, reqtempone, reqtemptwo, reqtemptre, reqtempfour, reqairflow, reqairbypass}; // put another register in this line to subscribe
+        for (int i = 0; i < (sizeof(rr)/sizeof(rr[0])); i++)
+        {
+          reqtypes r = rr[i];
+          char result = ReadModbus(regaddresses[r], regsizes[r], rsbuffer, regtypes[r] & 1); 
+          if (result == 0)
+          {
+            mqttclient.publish("ventilation/error/modbus/", "0"); //no error when connecting through modbus
+            for (int i = 0; i < regsizes[r]; i++)
+            {
+              char *name = getName(r, i);
+              char numstr[10];
+              if (name != NULL && strlen(name) > 0)
+              {
+                String mqname = "temp/";
+                switch (r)
                 {
-                  case 1: // Alarm.List_1_ID
-                  case 4: // Alarm.List_2_ID
-                  case 7: // Alarm.List_3_ID
-                    if (rsbuffer[i] > 0) 
-                    {
-                      //itoa((rsbuffer[i]), numstr, 10); 
-                      sprintf(numstr,"UNKNOWN"); // Preallocate unknown if no match if found
-                      for (int p = 0; p < (sizeof(AlarmListNumber)); p++)
+                case reqcontrol:
+                  mqname = "ventilation/control/"; // Subscribe to the "control" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;
+                case reqtime:
+                  mqname = "ventilation/time/"; // Subscribe to the "output" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;
+                case reqoutput1:
+                  mqname = "ventilation/output/"; // Subscribe to the "output" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;
+                case reqoutput2:
+                  mqname = "ventilation/output/"; // Subscribe to the "output" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;
+                case reqoutput3:
+                  mqname = "ventilation/output/"; // Subscribe to the "output" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;
+  //              case reqdisplay:
+  //                mqname = "ventilation/display/"; // Subscribe to the "input display" register
+  //                itoa((rsbuffer[i]), numstr, 10);
+  //                break;
+                case reqspeed:
+                  mqname = "ventilation/speed/"; // Subscribe to the "speed" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;
+                case reqalarm:
+                  mqname = "ventilation/alarm/"; // Subscribe to the "alarm" register
+  
+                  switch (i) 
+                  {
+                    case 1: // Alarm.List_1_ID
+                    case 4: // Alarm.List_2_ID
+                    case 7: // Alarm.List_3_ID
+                      if (rsbuffer[i] > 0) 
                       {
-                        if (AlarmListNumber[p] == rsbuffer[i])                        
+                        //itoa((rsbuffer[i]), numstr, 10); 
+                        sprintf(numstr,"UNKNOWN"); // Preallocate unknown if no match if found
+                        for (int p = 0; p < (sizeof(AlarmListNumber)); p++)
                         {
-                      //   memset(numstr, 0, sizeof numstr);
-                      //   strcpy (numstr,AlarmListText[p].c_str());
-                         sprintf(numstr,AlarmListText[p].c_str());
-                         break; 
-                        } 
+                          if (AlarmListNumber[p] == rsbuffer[i])                        
+                          {
+                        //   memset(numstr, 0, sizeof numstr);
+                        //   strcpy (numstr,AlarmListText[p].c_str());
+                           sprintf(numstr,AlarmListText[p].c_str());
+                           break; 
+                          } 
+                        }
+                      } else
+                      {
+                        sprintf(numstr,"None"); // No alarm, output None   
                       }
-                    } else
-                    {
-                      sprintf(numstr,"None"); // No alarm, output None   
-                    }
-                    break;
-                  case 2: // Alarm.List_1_Date
-                  case 5: // Alarm.List_2_Date
-                  case 8: // Alarm.List_3_Date
-                    if (rsbuffer[i] > 0) 
-                    {
-                      sprintf(numstr,"%d",(rsbuffer[i] >> 9) + 1980); 
-                      sprintf(numstr + strlen(numstr),"-%02d",(rsbuffer[i] & 0x1E0) >> 5);
-                      sprintf(numstr + strlen(numstr),"-%02d",(rsbuffer[i] & 0x1F));
-                    } else
-                    {
-                      sprintf(numstr,"N/A"); // No alarm, output N/A 
-                    }
-                    break;
-                  case 3: // Alarm.List_1_Time
-                  case 6: // Alarm.List_2_Time
-                  case 9: // Alarm.List_3_Time
-                    if (rsbuffer[i] > 0) 
-                    {                  
-                      sprintf(numstr,"%02d",rsbuffer[i] >> 11); 
-                      sprintf(numstr + strlen(numstr),":%02d",(rsbuffer[i] & 0x7E0) >> 5);
-                      sprintf(numstr + strlen(numstr),":%02d",(rsbuffer[i] & 0x11F)* 2);   
-                    } else
-                    {
-                      sprintf(numstr,"N/A"); // No alarm, output N/A  
-                    }
-                    
-                    break;                   
-                  default: // used for Status bit (case 0)
-                    itoa((rsbuffer[i]), numstr, 10); 
+                      break;
+                    case 2: // Alarm.List_1_Date
+                    case 5: // Alarm.List_2_Date
+                    case 8: // Alarm.List_3_Date
+                      if (rsbuffer[i] > 0) 
+                      {
+                        sprintf(numstr,"%d",(rsbuffer[i] >> 9) + 1980); 
+                        sprintf(numstr + strlen(numstr),"-%02d",(rsbuffer[i] & 0x1E0) >> 5);
+                        sprintf(numstr + strlen(numstr),"-%02d",(rsbuffer[i] & 0x1F));
+                      } else
+                      {
+                        sprintf(numstr,"N/A"); // No alarm, output N/A 
+                      }
+                      break;
+                    case 3: // Alarm.List_1_Time
+                    case 6: // Alarm.List_2_Time
+                    case 9: // Alarm.List_3_Time
+                      if (rsbuffer[i] > 0) 
+                      {                  
+                        sprintf(numstr,"%02d",rsbuffer[i] >> 11); 
+                        sprintf(numstr + strlen(numstr),":%02d",(rsbuffer[i] & 0x7E0) >> 5);
+                        sprintf(numstr + strlen(numstr),":%02d",(rsbuffer[i] & 0x11F)* 2);   
+                      } else
+                      {
+                        sprintf(numstr,"N/A"); // No alarm, output N/A  
+                      }
+                      
+                      break;                   
+                    default: // used for Status bit (case 0)
+                      itoa((rsbuffer[i]), numstr, 10); 
+                  }
+                  break;
+                case reqinputairtemp:
+                  mqname = "ventilation/inputairtemp/"; // Subscribe to the "inputairtemp" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;    
+                case reqprogram:
+                  mqname = "ventilation/weekprogram/"; // Subscribe to the "week program" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;     
+                case requser:
+                  mqname = "ventilation/user/"; // Subscribe to the "user" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;         
+                case reqinfo1:
+                  mqname = "ventilation/info/"; // Subscribe to the "info" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;   
+                case reqinfo2:
+                  mqname = "ventilation/info/"; // Subscribe to the "info" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;  
+                case reqinfo3:
+                  mqname = "ventilation/info/"; // Subscribe to the "info" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;  
+                case reqinfo4:
+                  mqname = "ventilation/info/"; // Subscribe to the "info" register
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;        
+                case reqtempone:
+                    mqname = "ventilation/temp/"; // Subscribe to "temp" register
+                  dtostrf((rsbuffer[i] / 100.0), 5, 2, numstr);
+                  break;
+                case reqtemptwo:
+                    mqname = "ventilation/temp/"; // Subscribe to "temp" register
+                  dtostrf((rsbuffer[i] / 100.0), 5, 2, numstr);
+                  break;
+                case reqtemptre:
+                  mqname = "ventilation/temp/"; // Subscribe to "temp" register
+                  dtostrf((rsbuffer[i] / 100.0), 5, 2, numstr);
+                  break;
+                case reqtempfour:
+                  if (strncmp("RH", name, 2) == 0) {
+                    mqname = "ventilation/moist/"; // Subscribe to moisture-level
+                  } else {
+                    mqname = "ventilation/temp/"; // Subscribe to "temp" register
+                  }
+                  dtostrf((rsbuffer[i] / 100.0), 5, 2, numstr);
+                  break;
+                 case reqairflow:
+                  mqname = "ventilation/airflow/"; // Subscribe to the "airflow" register  Tilføjet af Nicklas så vi kan aflæse hvornår vores filter skal udskiftes
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;
+                 case reqairbypass:
+                  mqname = "ventilation/airbypass/"; // Subscribe to the "airflow" register  Tilføjet af Nicklas så vi kan aflæse hvornår vores filter skal udskiftes
+                  itoa((rsbuffer[i]), numstr, 10);
+                  break;
                 }
-                break;
-              case reqinputairtemp:
-                mqname = "ventilation/inputairtemp/"; // Subscribe to the "inputairtemp" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;    
-              case reqprogram:
-                mqname = "ventilation/weekprogram/"; // Subscribe to the "week program" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;     
-              case requser:
-                mqname = "ventilation/user/"; // Subscribe to the "user" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;         
-              case reqinfo1:
-                mqname = "ventilation/info/"; // Subscribe to the "info" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;   
-              case reqinfo2:
-                mqname = "ventilation/info/"; // Subscribe to the "info" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;  
-              case reqinfo3:
-                mqname = "ventilation/info/"; // Subscribe to the "info" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;  
-              case reqinfo4:
-                mqname = "ventilation/info/"; // Subscribe to the "info" register
-                itoa((rsbuffer[i]), numstr, 10);
-                break;        
-              case reqtempone:
-                  mqname = "ventilation/temp/"; // Subscribe to "temp" register
-                dtostrf((rsbuffer[i] / 100.0), 5, 2, numstr);
-                break;
-              case reqtemptwo:
-                  mqname = "ventilation/temp/"; // Subscribe to "temp" register
-                dtostrf((rsbuffer[i] / 100.0), 5, 2, numstr);
-                break;
-              case reqtemptre:
-                mqname = "ventilation/temp/"; // Subscribe to "temp" register
-                dtostrf((rsbuffer[i] / 100.0), 5, 2, numstr);
-                break;
-              case reqtempfour:
-                if (strncmp("RH", name, 2) == 0) {
-                  mqname = "ventilation/moist/"; // Subscribe to moisture-level
-                } else {
-                  mqname = "ventilation/temp/"; // Subscribe to "temp" register
-                }
-                dtostrf((rsbuffer[i] / 100.0), 5, 2, numstr);
-                break;
-               case reqairflow:
-                mqname = "ventilation/airflow/"; // Subscribe to the "airflow" register  Tilføjet af Nicklas så vi kan aflæse hvornår vores filter skal udskiftes
-                itoa((rsbuffer[i]), numstr, 10);
-                break;
-               case reqairbypass:
-                mqname = "ventilation/airbypass/"; // Subscribe to the "airflow" register  Tilføjet af Nicklas så vi kan aflæse hvornår vores filter skal udskiftes
-                itoa((rsbuffer[i]), numstr, 10);
-                break;
+                mqname += (char *)name;
+                mqttclient.publish(mqname.c_str(), numstr);
               }
-              mqname += (char *)name;
-              mqttclient.publish(mqname.c_str(), numstr);
             }
           }
+          else {
+             char numstr1[10];
+             char numstr2[10];
+            char* failnr = itoa(regaddresses[r], numstr1, 10);
+            char* failtype = itoa(regtypes[r], numstr2, 10);
+            mqttclient.publish("ventilation/error/modbus/", "1"); //error when connecting through modbus
+            mqttclient.publish("ventilation/error/modbuscase/address/", failnr); //error when connecting through modbus
+            mqttclient.publish("ventilation/error/modbuscase/type/", failtype); //error when connecting through modbus
+          }       
         }
-        else {
-           char numstr1[10];
-           char numstr2[10];
-          char* failnr = itoa(regaddresses[r], numstr1, 10);
-          char* failtype = itoa(regtypes[r], numstr2, 10);
-          mqttclient.publish("ventilation/error/modbus/", "1"); //error when connecting through modbus
-          mqttclient.publish("ventilation/error/modbuscase/address/", failnr); //error when connecting through modbus
-          mqttclient.publish("ventilation/error/modbuscase/type/", failtype); //error when connecting through modbus
-        }       
-      }
-
-      // Handle text fields
-      reqtypes rr2[] = {reqdisplay1, reqdisplay2}; // put another register in this line to subscribe
-      for (int i = 0; i < (sizeof(rr2)/sizeof(rr2[0])); i++) 
-      {
-        reqtypes r = rr2[i];
-
-        char result = ReadModbus(regaddresses[r], regsizes[r], rsbuffer, regtypes[r] & 1);
-        if (result == 0)
+  
+        // Handle text fields
+        reqtypes rr2[] = {reqdisplay1, reqdisplay2}; // put another register in this line to subscribe
+        for (int i = 0; i < (sizeof(rr2)/sizeof(rr2[0])); i++) 
         {
-          String text = "";
-          String mqname = "ventilation/text/";
-
-          for (int i = 0; i < regsizes[r]; i++)
+          reqtypes r = rr2[i];
+  
+          char result = ReadModbus(regaddresses[r], regsizes[r], rsbuffer, regtypes[r] & 1);
+          if (result == 0)
           {
-              char *name = getName(r, i);
-
-              if ((rsbuffer[i] & 0x00ff) == 0xDF) {
-                text += (char)0x20; // replace degree sign with space
-              } else {
-                text += (char)(rsbuffer[i] & 0x00ff);
-              }
-              if ((rsbuffer[i] >> 8) == 0xDF) {
-                text += (char)0x20; // replace degree sign with space
-              } else { 
-                text += (char)(rsbuffer[i] >> 8);
-              }
-              mqname += (char *)name;
+            String text = "";
+            String mqname = "ventilation/text/";
+  
+            for (int i = 0; i < regsizes[r]; i++)
+            {
+                char *name = getName(r, i);
+  
+                if ((rsbuffer[i] & 0x00ff) == 0xDF) {
+                  text += (char)0x20; // replace degree sign with space
+                } else {
+                  text += (char)(rsbuffer[i] & 0x00ff);
+                }
+                if ((rsbuffer[i] >> 8) == 0xDF) {
+                  text += (char)0x20; // replace degree sign with space
+                } else { 
+                  text += (char)(rsbuffer[i] >> 8);
+                }
+                mqname += (char *)name;
+            }
+            mqttclient.publish(mqname.c_str(), text.c_str());
           }
-          mqttclient.publish(mqname.c_str(), text.c_str());
         }
+        lastMsg = now;
       }
-      lastMsg = now;
     }
   }
 }
