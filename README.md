@@ -63,7 +63,7 @@ My board design rev 2.1 is seen here:
 ![Bottom](/electronics/Bottom.PNG)
 ![Top](/electronics/Top.PNG)
 
-A wiring example on a Comfort 300 and Wavin AHC9000 is shown here:
+A wiring example on a Comfort 300 and Wavin AHC9000 is shown here (NOTE: you might need external supply for the board as Nilan might not be able to serve power during peaks - so when sending over WiFi):
 ![Top](/electronics/Connections.png)
 
 On the Wavin you simply use a patch cable (straight) and connect it from the module to the Modbus port and then you are done :)
