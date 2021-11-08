@@ -31,6 +31,25 @@ I (nic6911) have adapted the code in this fork to fit with the hardware I have c
 
 For setting up your wifi and mqtt broker provide your credentials in the configuration.h file
 
+#### Major SW change 8/11/2021 !
+
+The latest SW commit implements a WiFi manager enabling easy connection to your WiFi network and subsequently upload of Arduino code wirelessly through the Arduino IDE with your own MQTT settings ! 
+So, when you connect the module to power it will show up as an access point:
+![AP](/OTA/AP.png)
+
+When connecting to the AP it will on most computers automaticlly open up a browser dialog. If not, go to 192.168.4.1 to see the WiFi manager dialog:
+![wifimanager](/OTA/wifi_setting.png)
+
+When done you will now be able to see the device in the Arduino IDE and thus able to upload code to it without a programmer:
+![upload](/OTA/upload.png)
+
+The things marked in red is settings you'll need to have.
+
+Remember to edit the MQTT settings befor uploading:
+![mqttsetting](/OTA/mqttsetting.png)
+
+Enjoy !
+
 #### Video Tutorials
 These tutorials was made for my Wavin code, but the exact same applies for this Nilan code. The Nilan code also supports OTA update as the Wavin.
 
