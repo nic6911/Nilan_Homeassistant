@@ -24,7 +24,7 @@
 REV 28122020
 For Discovery use https://github.com/plapointe6/HAMqttDevice
 */
-
+#include <FS.h>  
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <ArduinoOTA.h>
@@ -52,9 +52,9 @@ WiFiManager wifiManager;
 
 
 char chipid[12];
-const char* mqttserver = MQTTSERVER;
-const char* mqttusername = MQTTUSERNAME;
-const char* mqttpassword = MQTTPASSWORD;
+char mqttserver[40]=MQTTSERVER;
+char mqttusername[20]=MQTTUSERNAME;
+char mqttpassword[20]=MQTTPASSWORD;
 WiFiServer server(80);
 WiFiClient client;
 PubSubClient mqttclient(client);
@@ -249,10 +249,95 @@ JsonObject HandleRequest(JsonDocument& doc)
   return root;
 }
 
+//flag for saving data
+bool shouldSaveConfig = false;
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  shouldSaveConfig = true;
+}
+
 void setup()
 {
   WiFi.mode(WIFI_STA);
-  wifiManager.autoConnect("MODBUS-MODULE");
+  //read configuration from FS json
+  if (SPIFFS.begin()) {
+    if (SPIFFS.exists("/config.json")) {
+      //file exists, reading and loading
+      File configFile = SPIFFS.open("/config.json", "r");
+      if (configFile) {
+        size_t size = configFile.size();
+        // Allocate a buffer to store contents of the file.
+        std::unique_ptr<char[]> buf(new char[size]);
+
+        configFile.readBytes(buf.get(), size);
+#ifdef ARDUINOJSON_VERSION_MAJOR >= 6
+        DynamicJsonDocument json(1024);
+        auto deserializeError = deserializeJson(json, buf.get());
+        serializeJson(json, Serial);
+        if ( ! deserializeError ) {
+#else
+        DynamicJsonBuffer jsonBuffer;
+        JsonObject& json = jsonBuffer.parseObject(buf.get());
+        json.printTo(Serial);
+        if (json.success()) {
+#endif
+          strcpy(mqttserver, json["mqtt_server"]);
+          strcpy(mqttusername, json["mqtt_user"]);
+          strcpy(mqttpassword, json["mqtt_pass"]);
+        }
+      }
+    }
+  } 
+  //end read
+  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqttserver, 40);
+  WiFiManagerParameter custom_mqtt_user("user", "mqtt username", mqttusername, 20);
+  WiFiManagerParameter custom_mqtt_pass("password", "mqtt password", mqttpassword, 20);
+
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+  wifiManager.addParameter(&custom_mqtt_server);
+  wifiManager.addParameter(&custom_mqtt_user);
+  wifiManager.addParameter(&custom_mqtt_pass);
+    //fetches ssid and pass and tries to connect
+    //if it does not connect it starts an access point with the specified name
+    //and goes into a blocking loop awaiting configuration
+    if (!wifiManager.autoConnect("MODBUS-MODULE")) {
+      delay(3000);
+      //reset and try again, or maybe put it to deep sleep
+      ESP.restart();
+      delay(5000);
+    }
+
+    //read updated parameters
+    strcpy(mqttserver, custom_mqtt_server.getValue());
+    strcpy(mqttusername, custom_mqtt_user.getValue());
+    strcpy(mqttpassword, custom_mqtt_pass.getValue());
+    
+    //save the custom parameters to FS
+    if (shouldSaveConfig) {
+    #ifdef ARDUINOJSON_VERSION_MAJOR >= 6
+      DynamicJsonDocument json(1024);
+    #else
+      DynamicJsonBuffer jsonBuffer;
+      JsonObject& json = jsonBuffer.createObject();
+    #endif
+      json["mqtt_server"] = mqttserver;
+      json["mqtt_user"] = mqttusername;
+      json["mqtt_pass"] = mqttpassword;
+    
+      File configFile = SPIFFS.open("/config.json", "w");
+    
+    #ifdef ARDUINOJSON_VERSION_MAJOR >= 6
+      serializeJson(json, Serial);
+      serializeJson(json, configFile);
+    #else
+      json.printTo(Serial);
+      json.printTo(configFile);
+    #endif
+      configFile.close();
+      //end save
+    }
   pinMode(funcact1, OUTPUT);
   pinMode(funcact2, OUTPUT);  
   digitalWrite(funcact1, LOW);
@@ -264,11 +349,6 @@ void setup()
   delay(500);
   WiFi.hostname(host);
   ArduinoOTA.setHostname(host);
-  while (WiFi.waitForConnectResult() != WL_CONNECTED)
-  {
-    delay(5000);
-    ESP.restart();
-  }
   ArduinoOTA.onStart([]() {
   });
   ArduinoOTA.onEnd([]() {
