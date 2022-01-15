@@ -23,7 +23,6 @@ wifi:
 
 captive_portal:
 
-
 uart:
   rx_pin: RX
   tx_pin: TX
@@ -50,13 +49,41 @@ external_components:
     components: [ modbus, modbus_controller ]
  
 nilan:
-
+    
 select:
+  - platform: nilan
+    modbus_controller_id: nilan_modbus_controller
+    name: "Week program select"
+    id: nilan_week_program_select
+    address: 500
+    force_new_range: true
+    options:
+      - "None"
+      - "Program 1"
+      - "Program 2"
+      - "Program 3"
+      - "Erase"
+      
   - platform: nilan
     modbus_controller_id: nilan_modbus_controller
     name: "Set user function"
     id: nilan_set_user_function
     address: 601
+    force_new_range: true
+    options:
+      - "None"
+      - "Extend"
+      - "Inlet"
+      - "Exhaust"
+      - "External heater offset"
+      - "Ventilate"
+      - "Cooker Hood"
+
+  - platform: nilan
+    modbus_controller_id: nilan_modbus_controller
+    name: "Set user function 2"
+    id: nilan_set_user_function2
+    address: 611
     force_new_range: true
     options:
       - "None"
@@ -599,6 +626,27 @@ text_sensor:
 
   - platform: modbus_controller
     modbus_controller_id: nilan_modbus_controller
+    name: "Actual user function 2"
+    id: nilan_actual_user_function2
+    register_type: holding
+    address: 610
+    lambda: !lambda |-
+      uint16_t int_user_function2 = (data[item->offset] << 8) + data[item->offset+1];
+      ESP_LOGD("main","Parsed user function 2 int : %d", int_user_function2);
+      std::string actual_user_function2;
+      switch(int_user_function2) {
+        case 0: { actual_user_function2 = "0 : None"; break; }
+        case 1: { actual_user_function2 = "1 : Extend"; break; }
+        case 2: { actual_user_function2 = "2 : Inlet"; break; }
+        case 3: { actual_user_function2 = "3 : Exhaust"; break; }
+        case 4: { actual_user_function2 = "4 : External heater offset"; break; }
+        case 5: { actual_user_function2 = "5 : Ventilate"; break; }
+        case 6: { actual_user_function2 = "6 : Cooker Hood"; break; }
+      }
+      return actual_user_function2;
+      
+  - platform: modbus_controller
+    modbus_controller_id: nilan_modbus_controller
     name: "Operation mode"
     id: nilan_operation_mode
     register_type: read
@@ -691,6 +739,48 @@ number:
 
   - platform: modbus_controller
     modbus_controller_id: nilan_modbus_controller
+    name: "User time set 2 (minutes)"
+    id: nilan_user_time_set2
+    value_type: U_WORD
+    min_value: 1.0
+    max_value: 480.0
+    lambda: !lambda |-
+      uint16_t hours = x/100; // 100 is 1 hour
+      uint16_t minutes = ((uint16_t)x) % 100;
+      return (hours*60) + minutes;
+    write_lambda: !lambda |-
+      uint16_t intVal = x;
+      uint16_t firstDigit = (intVal / 60); // 1 hour is written as '100' and not '60'
+      uint16_t lastDigits = (intVal % 60); // 1:30 hours is written as '130' and not '90'
+      uint16_t result = (firstDigit*100) + lastDigits;
+      payload = modbus_controller::float_to_payload(result, modbus_controller::SensorValueType::U_WORD);
+      return x;
+    step: 1.0
+    address: 612
+    force_new_range: true
+    
+  - platform: modbus_controller
+    modbus_controller_id: nilan_modbus_controller
+    name: "User ventilation speed set 2"
+    id: nilan_user_ventilation_speed_set2
+    min_value: 0.0
+    max_value: 4.0
+    step: 1.0
+    address: 613
+    force_new_range: true
+  
+  - platform: modbus_controller
+    modbus_controller_id: nilan_modbus_controller
+    name: "User temperature set 2"
+    id: nilan_user_temperature_set2
+    min_value: 15.0
+    max_value: 30.0
+    step: 1.0
+    address: 614
+    force_new_range: true
+    
+  - platform: modbus_controller
+    modbus_controller_id: nilan_modbus_controller
     name: "Ventilation speed set"
     id: nilan_ventilation_speed_set
     min_value: 0
@@ -721,6 +811,16 @@ switch:
     force_new_range: true
     use_write_multiple: true
     address: 1001
+    
+  - platform: gpio
+    pin: 0
+    name: "Brugervalg 1"   
+    id: nilan_user_function2_switch
+      
+  - platform: gpio
+    pin: 2
+    name: "Brugervalg 2"   
+    id: nilan_user_funtion2_switch      
     
 climate:
   - platform: nilan

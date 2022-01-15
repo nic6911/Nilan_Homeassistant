@@ -104,14 +104,26 @@ cards:
       - type: custom:fold-entity-row
         head:
           type: section
-          label: Brugervalg
-        entities:
-          - input_select.weekprogram_mode
-          - select.set_user_function
-          - number.user_time_set_minutes
-          - entity: number.user_ventilation_speed_set
-            name: Blæser indstilling
-          - entity: number.user_temperature_set
-            name: Temperatur
-          - entity: switch.nilan_bruger_valg
-            name: Aktiver Brugervalg
+		  label: Brugervalg 1
+		entities:
+		  - select.set_user_function
+		  - number.user_time_set_minutes
+		  - entity: number.user_ventilation_speed_set
+			name: Blæser indstilling Brugervalg 1
+		  - entity: number.user_temperature_set
+			name: Temperatur Brugervalg 1
+		  - entity: switch.brugervalg_1
+			name: Aktiver Brugervalg 1
+	  - type: custom:fold-entity-row
+		head:
+		  type: section
+		  label: Brugervalg 2
+		entities:
+		  - select.set_user_function_2
+		  - number.user_time_set_2_minutes
+		  - entity: number.user_ventilation_speed_set_2
+			name: Blæser indstilling Brugervalg 2
+		  - entity: number.user_temperature_set_2
+			name: Temperatur Brugervalg 2
+		  - entity: switch.brugervalg_2
+			name: Aktiver Brugervalg 2
