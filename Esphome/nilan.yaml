@@ -39,7 +39,7 @@ modbus_controller:
   id: nilan_modbus_controller
   address: 30
   modbus_id: modbus_id
-  update_interval: 30s
+  update_interval: 45s
  
 external_components:
   - source: github://Jopand/esphome_components@develop
@@ -51,18 +51,6 @@ external_components:
 nilan:
     
 select:
-  - platform: nilan
-    modbus_controller_id: nilan_modbus_controller
-    name: "Week program select"
-    id: nilan_week_program_select
-    address: 500
-    force_new_range: true
-    options:
-      - "None"
-      - "Program 1"
-      - "Program 2"
-      - "Program 3"
-      - "Erase"
       
   - platform: nilan
     modbus_controller_id: nilan_modbus_controller
@@ -180,18 +168,6 @@ sensor:
     address: 221
     filters:
       - multiply: 0.01
-      
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "CO2"
-    id: nilan_co2_level
-    unit_of_measurement: "ppm"
-    icon: "mdi:molecule-co2"
-    accuracy_decimals: 0
-    register_type: read
-    address: 222
-    filters:
-      - multiply: 0.01        
 
   - platform: modbus_controller
     modbus_controller_id: nilan_modbus_controller
@@ -416,54 +392,6 @@ binary_sensor:
     register_type: read
     address: 101
     bitmask: 1
-      
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "Door open"
-    id: nilan_door_open
-    register_type: read
-    address: 102
-    bitmask: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "Smoke alarm"
-    id: nilan_smoke_alarm
-    register_type: read
-    address: 103
-    bitmask: 1
-    
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "Motor thermo fuse"
-    id: nilan_motor_thermo_fuse
-    register_type: read
-    address: 104
-    bitmask: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "Airflow monitor"
-    id: nilan_airflow_monitor
-    register_type: read
-    address: 106
-    bitmask: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "High pressure switch"
-    id: nilan_high_pressure
-    register_type: read
-    address: 107
-    bitmask: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "Low pressure switch"
-    id: nilan_low_pressure
-    register_type: read
-    address: 108
-    bitmask: 1
 
   - platform: modbus_controller
     modbus_controller_id: nilan_modbus_controller
@@ -471,22 +399,6 @@ binary_sensor:
     id: nilan_user_function_2
     register_type: read
     address: 113
-    bitmask: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "Air damper closed"
-    id: nilan_damper_closed
-    register_type: read
-    address: 114
-    bitmask: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: nilan_modbus_controller
-    name: "Air damper opened"
-    id: nilan_damper_opened
-    register_type: read
-    address: 115
     bitmask: 1
 
   - platform: modbus_controller
@@ -500,13 +412,6 @@ binary_sensor:
 ###########################
 #### HOLDING REGISTERS ####
 ###########################
-#  - platform: modbus_controller
-#    modbus_controller_id: nilan_modbus_controller
-#    name: "Bypass open request"
-#    id: nilan_bypass_open_request
-#    register_type: holding
-#    address: 102
-#    bitmask: 1
 
 
 text_sensor:
