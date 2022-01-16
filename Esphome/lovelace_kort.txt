@@ -85,12 +85,6 @@ cards:
           - entity: sensor.actual_user_function
             state_color: true
             name: Brugervalg aktiv
-          - entity: binary_sensor.air_damper_opened
-            name: Bypass
-            state_color: true
-          - entity: binary_sensor.smoke_alarm
-            name: Brand-Sensor
-            state_color: true
           - entity: sensor.aggregate_type
           - entity: sensor.operation_mode
           - entity: sensor.air_filter_alarm_status
@@ -101,29 +95,29 @@ cards:
             name: Dage til filterskift
   - type: entities
     entities:
-      - type: custom:fold-entity-row
-        head:
-          type: section
-		  label: Brugervalg 1
-		entities:
-		  - select.set_user_function
-		  - number.user_time_set_minutes
-		  - entity: number.user_ventilation_speed_set
-			name: Blæser indstilling Brugervalg 1
-		  - entity: number.user_temperature_set
-			name: Temperatur Brugervalg 1
-		  - entity: switch.brugervalg_1
-			name: Aktiver Brugervalg 1
-	  - type: custom:fold-entity-row
-		head:
-		  type: section
-		  label: Brugervalg 2
-		entities:
-		  - select.set_user_function_2
-		  - number.user_time_set_2_minutes
-		  - entity: number.user_ventilation_speed_set_2
-			name: Blæser indstilling Brugervalg 2
-		  - entity: number.user_temperature_set_2
-			name: Temperatur Brugervalg 2
-		  - entity: switch.brugervalg_2
-			name: Aktiver Brugervalg 2
+    - type: custom:fold-entity-row
+      head:
+        type: section
+        label: Brugervalg 1
+      entities:
+        - select.set_user_function
+        - number.user_time_set_minutes
+        - entity: number.user_ventilation_speed_set
+          name: Blæser indstilling Brugervalg 1
+        - entity: number.user_temperature_set
+          name: Temperatur Brugervalg 1
+        - entity: switch.brugervalg_1
+          name: Aktiver Brugervalg 1
+    - type: custom:fold-entity-row
+      head:
+        type: section
+        label: Brugervalg 2
+      entities:
+        - select.set_user_function_2
+        - number.user_time_set_2_minutes
+        - entity: number.user_ventilation_speed_set_2
+          name: Blæser indstilling Brugervalg 2
+        - entity: number.user_temperature_set_2
+          name: Temperatur Brugervalg 2
+        - entity: switch.brugervalg_2
+          name: Aktiver Brugervalg 2
