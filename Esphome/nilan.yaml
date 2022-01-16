@@ -39,7 +39,7 @@ modbus_controller:
   id: nilan_modbus_controller
   address: 30
   modbus_id: modbus_id
-  update_interval: 45s
+  update_interval: 30s
  
 external_components:
   - source: github://Jopand/esphome_components@develop
