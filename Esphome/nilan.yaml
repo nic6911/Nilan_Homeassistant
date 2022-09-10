@@ -44,9 +44,6 @@ modbus_controller:
 external_components:
   - source: github://Jopand/esphome_components@develop
     refresh: 0s
-  #- source: github://esphome/esphome@dev
-  #  refresh: 0s
-  #  components: [ modbus, modbus_controller ]
  
 nilan:
     
@@ -559,14 +556,13 @@ number:
     modbus_controller_id: nilan_modbus_controller
     name: "Temperature set"
     id: nilan_target_temperature_set
-    min_value: 15
+    min_value: 12
     max_value: 30
     step: 1.0
     address: 1004
     force_new_range: true
-    use_write_multiple: true 
-    write_lambda: "payload = modbus_controller::float_to_payload(x*100, modbus_controller::SensorValueType::U_WORD); return x;"
-    lambda: "return x*0.01;"
+    use_write_multiple: true
+    multiply: 100
 
 switch:
   - platform: modbus_controller
